@@ -16,9 +16,9 @@
 编译方面不要纠结，直接选择最默认的方式
 ```$shell
 ./configure
-# make clean 
-# make -j8
-# make install
+make clean 
+make -j8
+make install
 ```
 最后编译后的输出文件路径是/usr/local/Cellar/ffmpeg/4.1.3
 在编译Android后，再编译的Mac的，在中间遇到过的一些问题
@@ -166,3 +166,4 @@ target_link_libraries(
 5. 为可执行文件添加依赖库
 
 实例demo
+https://github.com/CFM880/ffplay_clion
