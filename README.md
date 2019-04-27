@@ -155,7 +155,12 @@ target_link_libraries(
 )
 
 ```
+
+### 运行
 最后build一下，就可以看到两个可运行选项了
+当然debug的话直接运行还需要将main函数中的参数指定一下，例如这样
+
+https://github.com/CFM880/ffplay_clion/blob/0313ee9c58e7d22242da9059daa00f854c58e19f/ffplay.c#L3692-L3693
 
 ## 总结
 这次移植，让我了解到，建立CMake项目的基本流程
