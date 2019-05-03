@@ -39,11 +39,13 @@ link_directories(
 
 add_executable(ffmpeg_demo ffplay.c)
 add_executable(test_ffmpeg main.cpp)
+add_executable(test_audio_video testReadInfo.cpp)
 
 set(SOURCE_FILES
         cmdutils.c,
         ffplay.c,
-        main.cpp
+        main.cpp,
+        testReadInfo.cpp
         )
 
 
@@ -63,6 +65,20 @@ target_link_libraries(
 
 target_link_libraries(
         test_ffmpeg
+        avcodec
+        avdevice
+        avfilter
+        avformat
+        avresample
+        avutil
+        postproc
+        swresample
+        swscale
+        SDL2
+)
+
+target_link_libraries(
+        test_audio_video
         avcodec
         avdevice
         avfilter
