@@ -38,6 +38,19 @@ int main(){
     avformat_network_init();
     avcodec_register_all();
 
+    if(SDL_Init(SDL_INIT_VIDEO | SDL_INIT_AUDIO | SDL_INIT_TIMER)) {
+        fprintf(stderr, "Could not initialize SDL - %s\n", SDL_GetError());
+        exit(1);
+    }
+
+    SDL_Event event;
+    SDL_Window *screen;
+    SDL_Renderer *renderer;
+    SDL_Texture *texture;
+    Uint8 *yPlane, *uPlane, *vPlane;
+    size_t yPlaneSz, uvPlaneSz;
+    int uvPitch;
+
 
     AVFormatContext *ic = avformat_alloc_context();
     int ret = avformat_open_input(&ic, url, NULL, NULL);
@@ -95,7 +108,7 @@ int main(){
     // 解码器初始化
     AVCodecContext *vc = avcodec_alloc_context3(vcodec);
     avcodec_parameters_to_context(vc, ic->streams[videoIndex]->codecpar);
-    vc->thread_count = 1;
+    vc->thread_count = 8;
 
     // 打开解码器
     ret = avcodec_open2(vc, NULL, NULL);
@@ -113,8 +126,55 @@ int main(){
     if (ret != 0) {
         printf("audio open failed!\n");
     }
+    screen = SDL_CreateWindow("My Game Window",
+                             SDL_WINDOWPOS_UNDEFINED,
+                             SDL_WINDOWPOS_UNDEFINED,
+                             vc->width, vc->height,
+                              0);
+
+    if(!screen) {
+        fprintf(stderr, "SDL: could not set video mode - exiting\n");
+        exit(1);
+    }
+    renderer = SDL_CreateRenderer(screen, -1, 0);
+    if (!renderer) {
+        fprintf(stderr, "SDL: could not create renderer - exiting\n");
+        exit(1);
+    }
+
+    texture = SDL_CreateTexture(
+            renderer,
+            SDL_PIXELFORMAT_YV12,
+            SDL_TEXTUREACCESS_STREAMING,
+            vc->width,
+            vc->height
+    );
+    if (!texture) {
+        fprintf(stderr, "SDL: could not create texture - exiting\n");
+        exit(1);
+    }
 
 
+    sws_ctx = sws_getContext(vc->width, vc->height,
+                             vc->pix_fmt, vc->width, vc->height,
+                             AV_PIX_FMT_YUV420P,
+                             SWS_BILINEAR,
+                             NULL,
+                             NULL,
+                             NULL);
+
+    // set up YV12 pixel array (12 bits per pixel)
+    yPlaneSz = vc->width * vc->height;
+    uvPlaneSz = vc->width * vc->height / 4;
+    yPlane = (Uint8*)malloc(yPlaneSz);
+    uPlane = (Uint8*)malloc(uvPlaneSz);
+    vPlane = (Uint8*)malloc(uvPlaneSz);
+    if (!yPlane || !uPlane || !vPlane) {
+        fprintf(stderr, "Could not allocate pixel buffers - exiting\n");
+        exit(1);
+    }
+
+    uvPitch = vc->width / 2;
     // 不能传空，
     // 内存分两部分，1部分是内存本身的空间，2，另一部分是对象内部数据的空间
     // 对象对象，并对象并减引用计数
@@ -127,8 +187,8 @@ int main(){
 
         if (ret != 0){
             cout<<"读取到结尾处 " <<endl;
-            int pos = 20 * r2d(ic->streams[videoIndex]->time_base);
-            av_seek_frame(ic, videoIndex, pos, AVSEEK_FLAG_BACKWARD|AVSEEK_FLAG_FRAME);
+//            int pos = 20 * r2d(ic->streams[videoIndex]->time_base);
+//            av_seek_frame(ic, videoIndex, pos, AVSEEK_FLAG_BACKWARD|AVSEEK_FLAG_FRAME);
             break;
         }
         /**
@@ -165,6 +225,47 @@ int main(){
             // 如果是视频帧
             if (cc == vc){
                 frameCount++;
+
+                AVPicture pict;
+                pict.data[0] = yPlane;
+                pict.data[1] = uPlane;
+                pict.data[2] = vPlane;
+                pict.linesize[0] = vc->width;
+                pict.linesize[1] = uvPitch;
+                pict.linesize[2] = uvPitch;
+
+                // Convert the image into YUV format that SDL uses
+                sws_scale(sws_ctx, (uint8_t const * const *) frame->data,
+                          frame->linesize, 0, vc->height, pict.data,
+                          pict.linesize);
+
+                SDL_UpdateYUVTexture(
+                        texture,
+                        NULL,
+                        yPlane,
+                        vc->width,
+                        uPlane,
+                        uvPitch,
+                        vPlane,
+                        uvPitch
+                );
+                SDL_RenderClear(renderer);
+                SDL_RenderCopy(renderer, texture, NULL, NULL);
+                SDL_RenderPresent(renderer);
+
+                SDL_PollEvent(&event);
+                switch (event.type) {
+                    case SDL_QUIT:
+                        SDL_DestroyTexture(texture);
+                        SDL_DestroyRenderer(renderer);
+                        SDL_DestroyWindow(screen);
+                        SDL_Quit();
+                        exit(0);
+                        break;
+                    default:
+                        break;
+                }
+
             }
 
         }
