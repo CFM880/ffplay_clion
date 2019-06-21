@@ -56,6 +56,7 @@ int OpenInput(string inputUrl) {
 }
 
 shared_ptr<AVPacket> ReadPacketFromSource(){
+    lastReadPacketTime = av_gettime();
     shared_ptr<AVPacket> packet(static_cast<AVPacket *> (av_malloc(sizeof(AVPacket))),[&](AVPacket *p){av_packet_free(&p);});
     av_init_packet(packet.get());
     int ret = av_read_frame(inputContext, packet.get());

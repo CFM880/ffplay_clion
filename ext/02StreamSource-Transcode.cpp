@@ -1,8 +1,4 @@
 //
-// Created by 程方明 on 2019-06-21.
-//
-
-//
 // Created by 程方明 on 2019-06-17.
 //
 
@@ -27,9 +23,27 @@ using namespace std;
 
 AVFormatContext *inputContext = nullptr;
 AVFormatContext *outputContext = nullptr;
+int64_t lastReadPacketTime;
+/**
+ * 多实例的时候可以传递当前实例
+ * @param ctx
+ * @return
+ */
+static int interrupt_cb(void *ctx) {
+    int timeout = 10;
+    if (av_gettime() - lastReadPacketTime > timeout * 1000 * 1000) {
+        exit(-1);
+    }
+    return 0;
+}
 
 int OpenInput(string inputUrl) {
     inputContext = avformat_alloc_context();
+    /**
+     * 一个周期回调一次
+     */
+    lastReadPacketTime = av_gettime();
+    inputContext->interrupt_callback.callback = interrupt_cb;
     int ret  = avformat_open_input(&inputContext, inputUrl.c_str(), nullptr, nullptr);
     if (ret < 0) {
         av_log(NULL, AV_LOG_ERROR, "Input file open input failed\n");
@@ -46,6 +60,7 @@ int OpenInput(string inputUrl) {
 }
 
 shared_ptr<AVPacket> ReadPacketFromSource(){
+    lastReadPacketTime = av_gettime();
     shared_ptr<AVPacket> packet(static_cast<AVPacket *> (av_malloc(sizeof(AVPacket))),[&](AVPacket *p){av_packet_free(&p);});
     av_init_packet(packet.get());
     int ret = av_read_frame(inputContext, packet.get());
@@ -114,7 +129,7 @@ int main(){
     Init();
     int ret = OpenInput("rtsp://184.72.239.149/vod/mp4://BigBuckBunny_175k.mov");
     if (ret >= 0) {
-        ret = OpenOut("/Users/chengfangming/Downloads/ffmpeg/yyyy.ts");
+        ret = OpenOut("udp://127.0.0.1:8790");
     }
     if (ret < 0 ) goto Error;
     while (true) {

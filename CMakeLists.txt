@@ -24,6 +24,17 @@ set(FFMPEG_EXEC_PREFIX "/usr/local/Cellar/ffmpeg/4.1.3")
 set(FFMPEG_LIBDIR "${ffmpeg_exec_prefix}/lib")
 set(FFMPEG_INCLUDE_DIRS "${ffmpeg_prefix}/include/")
 
+set(FFMPEG_ENV
+        avcodec
+        avdevice
+        avfilter
+        avformat
+        avresample
+        avutil
+        postproc
+        swresample
+        swscale
+        SDL2)
 
 include_directories(
         ${FFMPEG_INCLUDE_DIRS}
@@ -38,10 +49,12 @@ link_directories(
 )
 
 
+
 add_executable(ffmpeg_demo ffplay.c)
 add_executable(test_ffmpeg main.cpp)
 add_executable(test_audio_video testReadInfo.cpp)
 add_executable(save_files ext/01RtspSource-SaveFile.cpp)
+add_executable(transcode ext/02StreamSource-Transcode.cpp)
 
 set(SOURCE_FILES
         cmdutils.c,
@@ -49,62 +62,27 @@ set(SOURCE_FILES
         main.cpp,
         testReadInfo.cpp,
         ext/01RtspSource-SaveFile.cpp
+        ext/02StreamSource-Transcode.cpp
         )
 
 
 target_link_libraries(
         ffmpeg_demo
-        avcodec
-        avdevice
-        avfilter
-        avformat
-        avresample
-        avutil
-        postproc
-        swresample
-        swscale
-        SDL2
+        ${FFMPEG_ENV}
 )
 
 target_link_libraries(
         test_ffmpeg
-        avcodec
-        avdevice
-        avfilter
-        avformat
-        avresample
-        avutil
-        postproc
-        swresample
-        swscale
-        SDL2
+        ${FFMPEG_ENV}
 )
 
 target_link_libraries(
         test_audio_video
-        avcodec
-        avdevice
-        avfilter
-        avformat
-        avresample
-        avutil
-        postproc
-        swresample
-        swscale
-        SDL2
+        ${FFMPEG_ENV}
 )
 
 target_link_libraries(
         save_files
-        avcodec
-        avdevice
-        avfilter
-        avformat
-        avresample
-        avutil
-        postproc
-        swresample
-        swscale
-        SDL2
+        ${FFMPEG_ENV}
 )
 
