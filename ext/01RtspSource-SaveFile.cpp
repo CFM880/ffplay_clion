@@ -23,9 +23,23 @@ using namespace std;
 
 AVFormatContext *inputContext = nullptr;
 AVFormatContext *outputContext = nullptr;
+int64_t lastReadPacketTime;
+
+static int interrupt_cb(void *ctx) {
+    int timeout = 10;
+    if (av_gettime() - lastReadPacketTime > timeout * 1000 * 1000) {
+        exit(-1);
+    }
+    return 0;
+}
 
 int OpenInput(string inputUrl) {
     inputContext = avformat_alloc_context();
+    lastReadPacketTime = av_gettime();
+    /**
+     * 一个周期回调一次
+     */
+    inputContext->interrupt_callback.callback = interrupt_cb;
     int ret  = avformat_open_input(&inputContext, inputUrl.c_str(), nullptr, nullptr);
     if (ret < 0) {
         av_log(NULL, AV_LOG_ERROR, "Input file open input failed\n");
@@ -52,7 +66,7 @@ shared_ptr<AVPacket> ReadPacketFromSource(){
     }
 }
 
-int WirtePacket(shared_ptr<AVPacket> packet){
+int WritePacket(shared_ptr<AVPacket> packet){
     auto inputStream = inputContext->streams[packet->stream_index];
     auto outputStream = outputContext->streams[packet->stream_index];
     av_packet_rescale_ts(packet.get(), inputStream->time_base, outputStream->time_base);
@@ -116,7 +130,7 @@ int main(){
     while (true) {
         auto packet = ReadPacketFromSource();
         if (packet) {
-            ret = WirtePacket(packet);
+            ret = WritePacket(packet);
             if (ret >= 0) {
                 cout << "WritePacket Success" << packet->pos << endl;
             } else {

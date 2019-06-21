@@ -41,14 +41,14 @@ link_directories(
 add_executable(ffmpeg_demo ffplay.c)
 add_executable(test_ffmpeg main.cpp)
 add_executable(test_audio_video testReadInfo.cpp)
-add_executable(save_files ext/RtspSource-SaveFile.cpp)
+add_executable(save_files ext/01RtspSource-SaveFile.cpp)
 
 set(SOURCE_FILES
         cmdutils.c,
         ffplay.c,
         main.cpp,
         testReadInfo.cpp,
-        ext/RtspSource-SaveFile.cpp
+        ext/01RtspSource-SaveFile.cpp
         )
 
 
