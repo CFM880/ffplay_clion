@@ -502,7 +502,12 @@ static void check_options(const OptionDef *po)
         po++;
     }
 }
-
+/**
+ * 看程序中有没有对应的参数
+ * @param argc
+ * @param argv
+ * @param options
+ */
 void parse_loglevel(int argc, char **argv, const OptionDef *options)
 {
     int idx = locate_option(argc, argv, options, "loglevel");

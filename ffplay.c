@@ -61,6 +61,7 @@
 #include "cmdutils.c"
 
 #include <assert.h>
+#include <pthread.h>
 
 const char program_name[] = "ffplay";
 const int program_birth_year = 2003;
@@ -476,7 +477,11 @@ static int packet_queue_put_nullpacket(PacketQueue *q, int stream_index)
     pkt->stream_index = stream_index;
     return packet_queue_put(q, pkt);
 }
-
+/**
+ * 分了内存，设置互斥锁
+ * @param q
+ * @return
+ */
 /* packet queue handling */
 static int packet_queue_init(PacketQueue *q)
 {
@@ -686,7 +691,15 @@ static void frame_queue_unref_item(Frame *vp)
     av_frame_unref(vp->frame);
     avsubtitle_free(&vp->sub);
 }
-
+/**
+ * Frame与PacketQueue关联，分配frame
+ * 设置与自己队列相关的互斥锁
+ * @param f
+ * @param pktq
+ * @param max_size
+ * @param keep_last
+ * @return
+ */
 static int frame_queue_init(FrameQueue *f, PacketQueue *pktq, int max_size, int keep_last)
 {
     int i;
@@ -2041,6 +2054,9 @@ static int audio_thread(void *arg)
         return AVERROR(ENOMEM);
 
     do {
+        /**
+         * 解码并设置pts
+         */
         if ((got_frame = decoder_decode_frame(&is->auddec, frame, NULL)) < 0)
             goto the_end;
 
@@ -2213,6 +2229,7 @@ static int video_thread(void *arg)
 #endif
             duration = (frame_rate.num && frame_rate.den ? av_q2d((AVRational){frame_rate.den, frame_rate.num}) : 0);
             pts = (frame->pts == AV_NOPTS_VALUE) ? NAN : frame->pts * av_q2d(tb);
+            // 加入队列
             ret = queue_picture(is, frame, pts, duration, frame->pkt_pos, is->viddec.pkt_serial);
             av_frame_unref(frame);
 #if CONFIG_AVFILTER
@@ -2609,6 +2626,7 @@ static int stream_component_open(VideoState *is, int stream_index)
     }
 
     avctx->codec_id = codec->id;
+    // 最低分辨率
     if (stream_lowres > codec->max_lowres) {
         av_log(avctx, AV_LOG_WARNING, "The maximum value for lowres supported by the decoder is %d\n",
                 codec->max_lowres);
@@ -2626,6 +2644,10 @@ static int stream_component_open(VideoState *is, int stream_index)
         av_dict_set_int(&opts, "lowres", stream_lowres, 0);
     if (avctx->codec_type == AVMEDIA_TYPE_VIDEO || avctx->codec_type == AVMEDIA_TYPE_AUDIO)
         av_dict_set(&opts, "refcounted_frames", "1", 0);
+
+    /**
+     * 打开解码器
+     */
     if ((ret = avcodec_open2(avctx, codec, &opts)) < 0) {
         goto fail;
     }
@@ -2746,18 +2768,23 @@ static int is_realtime(AVFormatContext *s)
     return 0;
 }
 
+/**
+ * 上一步已经把Frame队列，packet队列，时钟设置好了
+ * @param arg
+ * @return
+ */
 /* this thread gets the stream from the disk or the network */
 static int read_thread(void *arg)
 {
     VideoState *is = arg;
     AVFormatContext *ic = NULL;
     int err, i, ret;
-    int st_index[AVMEDIA_TYPE_NB];
+    int st_index[AVMEDIA_TYPE_NB]; // AVMEDIA_TYPE_NB, AVMEDIA_TYPE_UNKNOWN=-1, -1，0，1，2....5
     AVPacket pkt1, *pkt = &pkt1;
     int64_t stream_start_time;
     int pkt_in_play_range = 0;
-    AVDictionaryEntry *t;
-    SDL_mutex *wait_mutex = SDL_CreateMutex();
+    AVDictionaryEntry *t; // 配置信息
+    SDL_mutex *wait_mutex = SDL_CreateMutex(); // 互斥锁
     int scan_all_pmts_set = 0;
     int64_t pkt_ts;
 
@@ -2767,7 +2794,8 @@ static int read_thread(void *arg)
         goto fail;
     }
 
-    memset(st_index, -1, sizeof(st_index));
+    memset(st_index, -1, sizeof(st_index));// 内存分配
+    // 内存流索引都是-1
     is->last_video_stream = is->video_stream = -1;
     is->last_audio_stream = is->audio_stream = -1;
     is->last_subtitle_stream = is->subtitle_stream = -1;
@@ -2779,12 +2807,13 @@ static int read_thread(void *arg)
         ret = AVERROR(ENOMEM);
         goto fail;
     }
-    ic->interrupt_callback.callback = decode_interrupt_cb;
-    ic->interrupt_callback.opaque = is;
+    ic->interrupt_callback.callback = decode_interrupt_cb; // 中断回调，返回is->abort_request
+    ic->interrupt_callback.opaque = is;// 回调的参数
     if (!av_dict_get(format_opts, "scan_all_pmts", NULL, AV_DICT_MATCH_CASE)) {
         av_dict_set(&format_opts, "scan_all_pmts", "1", AV_DICT_DONT_OVERWRITE);
         scan_all_pmts_set = 1;
     }
+    // 会把is->iformat填充上，设置keyvlaue
     err = avformat_open_input(&ic, is->filename, is->iformat, &format_opts);
     if (err < 0) {
         print_error(is->filename, err);
@@ -2793,25 +2822,31 @@ static int read_thread(void *arg)
     }
     if (scan_all_pmts_set)
         av_dict_set(&format_opts, "scan_all_pmts", NULL, AV_DICT_MATCH_CASE);
-
+    // 必须要有一个选项
     if ((t = av_dict_get(format_opts, "", NULL, AV_DICT_IGNORE_SUFFIX))) {
         av_log(NULL, AV_LOG_ERROR, "Option %s not found.\n", t->key);
         ret = AVERROR_OPTION_NOT_FOUND;
         goto fail;
     }
+    // 赋值给最大的结构体
     is->ic = ic;
 
     if (genpts)
         ic->flags |= AVFMT_FLAG_GENPTS;
-
+    /**
+     * inject_global_side_data赋值？？？
+     */
     av_format_inject_global_side_data(ic);
 
     if (find_stream_info) {
+        // 其实就是分配了有一个流参数组成的数组
         AVDictionary **opts = setup_find_stream_info_opts(ic, codec_opts);
         int orig_nb_streams = ic->nb_streams;
 
         err = avformat_find_stream_info(ic, opts);
-
+        /*
+         *这段没啥用呀
+         */
         for (i = 0; i < orig_nb_streams; i++)
             av_dict_free(&opts[i]);
         av_freep(&opts);
@@ -2852,9 +2887,17 @@ static int read_thread(void *arg)
 
     is->realtime = is_realtime(ic);
 
-    if (show_status)
-        av_dump_format(ic, 0, is->filename, 0);
+    if (show_status) {
+        pthread_t myself = pthread_self();
 
+        av_log(NULL, AV_LOG_ERROR, "Thread_Info  %ld\n",  myself->__sig);
+        av_log(NULL, AV_LOG_ERROR, "Dump info  iiiiiiiiiiiiiiiiiiii\n");
+        av_dump_format(ic, 0, is->filename, 0);
+    }
+    /**
+     * 类似一个数组字典，通过AVMediaType
+     * 拿到对应通过AVMediaType的索引
+     */
     for (i = 0; i < ic->nb_streams; i++) {
         AVStream *st = ic->streams[i];
         enum AVMediaType type = st->codecpar->codec_type;
@@ -2869,6 +2912,7 @@ static int read_thread(void *arg)
             st_index[i] = INT_MAX;
         }
     }
+    /**前面这段柑橘没啥用**/
 
     if (!video_disable)
         st_index[AVMEDIA_TYPE_VIDEO] =
@@ -2890,9 +2934,13 @@ static int read_thread(void *arg)
                                 NULL, 0);
 
     is->show_mode = show_mode;
+    /**
+     * 设置窗口大小
+     */
     if (st_index[AVMEDIA_TYPE_VIDEO] >= 0) {
         AVStream *st = ic->streams[st_index[AVMEDIA_TYPE_VIDEO]];
         AVCodecParameters *codecpar = st->codecpar;
+        //时间基准
         AVRational sar = av_guess_sample_aspect_ratio(ic, st, NULL);
         if (codecpar->width)
             set_default_window_size(codecpar->width, codecpar->height, sar);
@@ -3100,7 +3148,9 @@ static VideoState *stream_open(const char *filename, AVInputFormat *iformat)
         av_log(NULL, AV_LOG_FATAL, "SDL_CreateCond(): %s\n", SDL_GetError());
         goto fail;
     }
-
+    /**
+     * 设置当前时间
+     */
     init_clock(&is->vidclk, &is->videoq.serial);
     init_clock(&is->audclk, &is->audioq.serial);
     init_clock(&is->extclk, &is->extclk.serial);
@@ -3114,7 +3164,8 @@ static VideoState *stream_open(const char *filename, AVInputFormat *iformat)
     is->audio_volume = startup_volume;
     is->muted = 0;
     is->av_sync_type = av_sync_type;
-    is->read_tid     = SDL_CreateThread(read_thread, "read_thread", is);
+    /*开启线程读取线程把VideoState传入到读取线程*/
+    is->read_tid = SDL_CreateThread(read_thread, "read_thread", is);
     if (!is->read_tid) {
         av_log(NULL, AV_LOG_FATAL, "SDL_CreateThread(): %s\n", SDL_GetError());
 fail:
@@ -3676,7 +3727,8 @@ int main(int argc, char **argv)
 
     init_dynload();
 
-    av_log_set_flags(AV_LOG_SKIP_REPEATED);
+    av_log_set_flags(AV_LOG_DEBUG);
+    av_log(NULL, AV_LOG_ERROR, "Thread_Info  %ld\n",  pthread_self()->__sig);
     parse_loglevel(argc, argv, options);
 
     /* register all codecs, demux and protocols */
@@ -3690,8 +3742,8 @@ int main(int argc, char **argv)
     signal(SIGINT , sigterm_handler); /* Interrupt (ANSI).    */
     signal(SIGTERM, sigterm_handler); /* Termination (ANSI).  */
     argc = 2;
-    argv[1] = "/Users/chengfangming/Downloads/yyy.mkv";
-    show_banner(argc, argv, options);
+    argv[1] = "/Users/chengfangming/Downloads/yyy.mp4";
+   // show_banner(argc, argv, options);
 
     parse_options(NULL, argc, argv, options, opt_input_file);
 

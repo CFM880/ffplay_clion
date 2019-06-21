@@ -28,6 +28,7 @@ set(FFMPEG_INCLUDE_DIRS "${ffmpeg_prefix}/include/")
 include_directories(
         ${FFMPEG_INCLUDE_DIRS}
         ${SDL2_INCLUDE_DIRS}
+        header
 )
 
 
@@ -40,12 +41,14 @@ link_directories(
 add_executable(ffmpeg_demo ffplay.c)
 add_executable(test_ffmpeg main.cpp)
 add_executable(test_audio_video testReadInfo.cpp)
+add_executable(save_files ext/RtspSource-SaveFile.cpp)
 
 set(SOURCE_FILES
         cmdutils.c,
         ffplay.c,
         main.cpp,
-        testReadInfo.cpp
+        testReadInfo.cpp,
+        ext/RtspSource-SaveFile.cpp
         )
 
 
@@ -90,3 +93,18 @@ target_link_libraries(
         swscale
         SDL2
 )
+
+target_link_libraries(
+        save_files
+        avcodec
+        avdevice
+        avfilter
+        avformat
+        avresample
+        avutil
+        postproc
+        swresample
+        swscale
+        SDL2
+)
+
