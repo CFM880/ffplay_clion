@@ -16,11 +16,11 @@ set(SDL2_LIBRARIES "-L${SDL2_LIBDIR}  -lSDL2")
 string(STRIP "${SDL2_LIBRARIES}" SDL2_LIBRARIES)
 
 # FFmpeg
-set(ffmpeg_prefix "/usr/local/Cellar/ffmpeg/4.1.3")
+set(ffmpeg_prefix "/usr/local/Cellar/ffmpeg/4.1.3_1")
 set(ffmpeg_exec_prefix "${ffmpeg_prefix}")
 set(libdir "${ffmpeg_exec_prefix}/lib")
-set(FFMPEG_PREFIX "/usr/local/Cellar/ffmpeg/4.1.3")
-set(FFMPEG_EXEC_PREFIX "/usr/local/Cellar/ffmpeg/4.1.3")
+set(FFMPEG_PREFIX "/usr/local/Cellar/ffmpeg/4.1.3_1")
+set(FFMPEG_EXEC_PREFIX "/usr/local/Cellar/ffmpeg/4.1.3_1")
 set(FFMPEG_LIBDIR "${ffmpeg_exec_prefix}/lib")
 set(FFMPEG_INCLUDE_DIRS "${ffmpeg_prefix}/include/")
 
@@ -55,6 +55,7 @@ add_executable(test_ffmpeg main.cpp)
 add_executable(test_audio_video testReadInfo.cpp)
 add_executable(save_files ext/01RtspSource-SaveFile.cpp)
 add_executable(transcode ext/02StreamSource-Transcode.cpp)
+add_executable(pcmtoaac ext/03PcmToAac.cpp)
 
 set(SOURCE_FILES
         cmdutils.c,
@@ -63,6 +64,7 @@ set(SOURCE_FILES
         testReadInfo.cpp,
         ext/01RtspSource-SaveFile.cpp
         ext/02StreamSource-Transcode.cpp
+        ext/03PcmToAac.cpp
         )
 
 
@@ -83,6 +85,14 @@ target_link_libraries(
 
 target_link_libraries(
         save_files
+        ${FFMPEG_ENV}
+)
+target_link_libraries(
+        transcode
+        ${FFMPEG_ENV}
+)
+target_link_libraries(
+        pcmtoaac
         ${FFMPEG_ENV}
 )
 

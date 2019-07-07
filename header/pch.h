@@ -21,6 +21,7 @@ extern "C" {
 #include <libavfilter/buffersrc.h>
 #include <libswscale/swscale.h>
 #include <libswresample/swresample.h>
+#include <libavdevice/avdevice.h>
 };
 
 #endif //FFMPEG_DEMO_PCH_H
