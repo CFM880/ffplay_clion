@@ -56,6 +56,7 @@ add_executable(test_audio_video testReadInfo.cpp)
 add_executable(save_files ext/01RtspSource-SaveFile.cpp)
 add_executable(transcode ext/02StreamSource-Transcode.cpp)
 add_executable(pcmtoaac ext/03PcmToAac.cpp)
+add_executable(video_cat ext/04VideoCat.cpp)
 
 set(SOURCE_FILES
         cmdutils.c,
@@ -65,6 +66,7 @@ set(SOURCE_FILES
         ext/01RtspSource-SaveFile.cpp
         ext/02StreamSource-Transcode.cpp
         ext/03PcmToAac.cpp
+        ext/04VideoCat.cpp
         )
 
 
@@ -95,4 +97,7 @@ target_link_libraries(
         pcmtoaac
         ${FFMPEG_ENV}
 )
-
+target_link_libraries(
+        video_cat
+        ${FFMPEG_ENV}
+)
