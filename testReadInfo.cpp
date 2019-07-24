@@ -195,7 +195,7 @@ void audio_callback(void *userdata, Uint8 *stream, int len) {
 }
 
 int main(){
-    char *url ="/Users/chengfangming/Downloads/yyy.mp4";
+    char *url ="/Users/chengfangming/Downloads/ffmpeg.flv";
 //    av_log_set_level(AV_LOG_DEBUG);
     struct SwsContext *sws_ctx = NULL;
     av_register_all();
