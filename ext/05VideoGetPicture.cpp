@@ -95,7 +95,7 @@ int openOutput(string outputUrl) {
 
 int initDecodeContext(AVStream *inputStream) {
     auto codecId = inputStream->codec->codec_id;
-    auto codec = avcodec_find_encoder(codecId);
+    auto codec = avcodec_find_decoder(codecId);
     if (!codec) {
         return -1;
     }
@@ -152,7 +152,7 @@ shared_ptr<AVPacket> encode(AVCodecContext *encodeContext, AVFrame *frame) {
     packet->data = NULL;
     packet->size = 0;
     int ret = avcodec_encode_video2(encodeContext, packet.get(), frame, &gotOutput);
-    if (ret > 0 && gotOutput != 0) {
+    if (ret >= 0 && gotOutput) {
         return packet;
     } else {
         return nullptr;
@@ -215,13 +215,14 @@ int main() {
                 auto packetEncode = encode(encodeContext, videoFrame);
                 if(packetEncode)
                 {
-                    if (count == 200) {
+                    if (count >= 20000) {
                         ret = writePacket(packetEncode);
                         if (ret >= 0)
                         {
                             break;
                         }
                     }
+                    cout<< count << endl;
                     count++;
 
                 }
@@ -232,9 +233,9 @@ int main() {
     cout<<"got picture"<<endl;
     av_frame_free(&videoFrame);
     avcodec_close(encodeContext);
-    return 0;
     Error:
     closeInput();
     closeOutput();
-    return -1;
+    return 0;
+
 }
