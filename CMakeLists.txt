@@ -59,7 +59,7 @@ add_executable(pcmtoaac ext/03PcmToAac.cpp)
 add_executable(video_cat ext/04VideoCat.cpp)
 add_executable(video_get_picture ext/05VideoGetPicture.cpp ext/05VideoGetPicture.cpp)
 add_executable(ffmepg examples/ffmpeg_read/ffmpeg.c)
-add_executable(video_picture examples/yyy.cpp)
+add_executable(camera_push ext/06CamaraCatch.cpp)
 
 set(SOURCE_FILES
         cmdutils.c,
@@ -73,7 +73,7 @@ set(SOURCE_FILES
         ext/05VideoGetPicture.cpp
         examples/ffmpeg_read/ffmpeg.c
         examples/ffmpeg_read/ffmpeg.h
-        examples/yyy.cpp
+        ext/06CamaraCatch.cpp
         )
 
 
@@ -117,7 +117,8 @@ target_link_libraries(
         ffmepg
         ${FFMPEG_ENV}
 )
+
 target_link_libraries(
-        video_picture
+        camera_push
         ${FFMPEG_ENV}
 )
